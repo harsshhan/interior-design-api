@@ -1,11 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import FileResponse,StreamingResponse
+from fastapi.responses import StreamingResponse
 import replicate
 import requests
 import os
 from dotenv import load_dotenv
-from pathlib import Path
-import uuid
 from io import BytesIO
 
 load_dotenv()
@@ -17,26 +15,29 @@ app = FastAPI()
 async def process_image(input_file: bytes, steps: int = 40, prompt: str = "") -> bytes:
     print("Processing image...")
     image_file = BytesIO(input_file)
+
     input_data = {
         "image": image_file,
         "num_inference_steps": steps,
         "prompt": prompt
     }
     
-    print("Running Stable Diffusion img2img model...")
-    output = replicate.run(
+    # Call the Replicate API
+    image_url = replicate.run(
         "adirik/interior-design:76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38",
         input=input_data
     )
     
-    # Fetch the first generated image from the output URLs
-    if not output:
-        raise ValueError("No image generated.")
-    
-    response = requests.get(output[0])
+    print(f"Generated Image URL: {image_url}")
+
+    if not image_url.startswith("http"):
+        raise ValueError(f"Invalid URL received: {image_url}")
+
+    response = requests.get(image_url)
+
     if response.status_code != 200:
-        raise ValueError("Failed to fetch generated image.")
-    
+        raise ValueError(f"Failed to fetch image from {image_url}")
+
     return response.content
 
 @app.post("/generate-image/")
